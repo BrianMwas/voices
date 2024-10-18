@@ -24,7 +24,10 @@ Resources:
     Properties:
       VpcId: !Ref AgentVPC
       CidrBlock: 10.0.0.0/24
-      AvailabilityZone: "eu-west-2"
+      AvailabilityZone: !Select
+        - 0
+        - !GetAZs
+          Ref: AWS::Region
       MapPublicIpOnLaunch: true
 
   # Create a private subnet within the VPC
@@ -33,8 +36,14 @@ Resources:
     Properties:
       VpcId: !Ref AgentVPC
       CidrBlock: 10.0.1.0/24
-      AvailabilityZone: "eu-west-2"
+      AvailabilityZone: !Select
+        - 0
+        - !GetAZs
+          Ref: AWS::Region
       MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-PrivateSubnet
 
   # Allocate an Elastic IP address for the NAT Gateway
   NATIPAddress:
@@ -116,7 +125,7 @@ Resources:
   TaskExecutionRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: ecsTaskExecutionRole  # You can name this role, or let CloudFormation name it
+      RoleName: ecsTaskExecutionRole2
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -124,6 +133,8 @@ Resources:
             Principal:
               Service: ecs-tasks.amazonaws.com
             Action: "sts:AssumeRole"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
       Policies:
         - PolicyName: ECSTaskExecutionAndSecretsPolicy
           PolicyDocument:
@@ -192,7 +203,7 @@ Resources:
     Type: AWS::ECS::Service
     Properties:
       Cluster: !Ref AgentCluster 
-      DesiredCount: 0 # Initially set to 0 because the image doesn't exist yet
+      DesiredCount: 2 # Initially set to 0 because the image doesn't exist yet
       TaskDefinition: !Ref VoiceAgentTaskDefinition 
       LaunchType: FARGATE
       NetworkConfiguration:
@@ -200,4 +211,12 @@ Resources:
           Subnets:
             - !Ref PrivateSubnet 
           SecurityGroups:
-            - !Ref SecurityGroup 
+            - !Ref SecurityGroup
+
+Outputs:
+  PrivateSubnetId:
+    Description: ID of the private subnet
+    Value: !Ref PrivateSubnet
+    Export:
+      Name: !Sub "${AWS::StackName}-PrivateSubnetId"
+

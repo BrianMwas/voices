@@ -1,48 +1,33 @@
 # This is an example Dockerfile that builds a minimal container for running LK Agents
 # syntax=docker/dockerfile:1
-ARG PYTHON_VERSION=3.12.4
-FROM python:${PYTHON_VERSION}-slim
+ARG PYTHON_VERSION=3.12
+FROM python:${PYTHON_VERSION}-slim-bullseye
 
-# Prevents Python from writing pyc files.
+# Prevents Python from writing pyc files and buffering stdout/stderr
 ENV PYTHONDONTWRITEBYTECODE=1
-
-# Keeps Python from buffering stdout and stderr to avoid situations where
-# the application crashes without emitting any logs due to buffering.
 ENV PYTHONUNBUFFERED=1
 
-# Create a non-privileged user that the app will run under.
-# See https://docs.docker.com/develop/develop-images/dockerfile_best-practices/#user
-ARG UID=10001
-RUN adduser \
-    --disabled-password \
-    --gecos "" \
-    --home "/home/appuser" \
-    --shell "/sbin/nologin" \
-    --uid "${UID}" \
-    appuser
+# Set the working directory in the container
+WORKDIR /app
 
+RUN echo "Acquire::http::Pipeline-Depth 0;" > /etc/apt/apt.conf.d/99custom && \
+    echo "Acquire::http::No-Cache true;" >> /etc/apt/apt.conf.d/99custom && \
+    echo "Acquire::BrokenProxy    true;" >> /etc/apt/apt.conf.d/99custom
 
-# Install gcc and other build dependencies.
-RUN apt-get update && \
-    apt-get install -y \
+# Install system dependencies
+RUN apt-get update && apt-get install -y --fix-missing \
     gcc \
     python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
-USER appuser
-
-RUN mkdir -p /home/appuser/.cache
-RUN chown -R appuser /home/appuser/.cache
-
-WORKDIR /home/appuser
-
+# Copy the requirements file into the container
 COPY requirements.txt .
-RUN python -m pip install --user --no-cache-dir -r requirements.txt
 
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy the rest of the application's code
 COPY . .
 
-# ensure that any dependent models are downloaded at build-time
-RUN python main.py download-files
-
-# Run the application.
-CMD ["python", "agent.py", "start"]
+# Run the application
+CMD ["python", "main.py", "start"]
