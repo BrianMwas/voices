@@ -176,10 +176,7 @@ async def entrypoint(ctx: JobContext):
         chat_mode=ChatMode.CONTEXT,
     )
 
-    # This project is configured to use Deepgram STT, OpenAI LLM and TTS plugins
-    # Other great providers exist like Cartesia and ElevenLabs
-    # Learn more and pick the best one for your app:
-    # https://docs.livekit.io/agents/plugins
+
     assistant = VoicePipelineAgent(
         vad=ctx.proc.userdata["vad"],
         stt=deepgram.STT(),
